@@ -485,7 +485,7 @@ void binToDecSing(char byte)
     printf("%d", (int)(byte));
 }
 
-int pow(int a, int b){
+int potenza(int a, int b){
     int i, ret=a;
     if(b==0){ret=1;}
     for(i=1;i<b;i++){
