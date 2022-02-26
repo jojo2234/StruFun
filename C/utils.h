@@ -1,5 +1,5 @@
-#ifndef SHELL_H_INCLUDED
-#define SHELL_H_INCLUDED
+#ifndef UTILS_H_INCLUDED
+#define UTILS_H_INCLUDED
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -11,31 +11,40 @@
 #include <sys/types.h>
 #include <dirent.h>
 //#include <X11/Xlib.h>
+#include <openssl/evp.h>
+#include <openssl/ssl.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
+#include <openssl/md5.h>
 #ifdef _WIN32
     #include <windows.h>
+#else
+#include <sys/stat.h>
+#include <sys/mman.h>
 #endif
 
 /* 
 .lxf = Linux eXecutable File
 .lsi = Linux Software Installer
 .sh = Shell file
-gcc nomeFile.c -S -o nomeFile.asm per ottenere l'assembly
-gcc nomeFile.c -O0 -o nomeFile.lxf per ottenere Linux-eXecutable-File (eseguibile) senza ottimizzazione (esecuzione sequenziale)
-gcc nomeFile.c -o nomeFile.lxf ottiene file eseguibile con ottimizzazione se prevista dal compilatore
-gcc nomeFile.c -lm -o nomeFile.lxf Il parametro lm serve per rendere funzionante dentro la libreria le funzioni di math.h 
-Si usa A per muovere il cursore di tot linee in su
-Si usa B per muoverlo in giu, C per farlo andare avanti mentre D per farlo tornare indietro.
+gcc nomeFile.c -S -o nomeFile.asm To obtain an assembly
+gcc nomeFile.c -O0 -o nomeFile.lxf To obtain a Linux-eXecutable-File (executable) without any optimization
+gcc nomeFile.c -o nomeFile.lxf You can obtain the executable with optimization offered by compiler if supported
+gcc nomeFile.c -lm -o nomeFile.lxf The lm parameter is used for math.h library
+Use A to move the cursor on N line up
+Use B to move it down, C to forward it and D to roll it back.
 \033[<N>D
 \033[<N>A
-dove N rappresenta il numero che scelgo io.
-Oltre a \033 esiste la sequenza di escape \x1B che essenzialmente e la stessa cosa ma in esadecimale mentre 033 è in ottale e 27 è la corrispondenza in decimale.
-Su linux da terminale dare xev per ottenere possibilità di sapere a quali caratteri corrispondono i caratteri.
-Editor esadecimale da scaricare si chiama GHex.
+where N is the number that I have choosen.
+Escape sequence \033 and \x1B are the same 033 is octal, 27 is decimal.
+On linux use xev from terminal to obtain characters informations.
+GHex hex editor.
 To compile with x11 add -L/usr/x11/lib -lx11 -lstdc++
-nota %p nel printf permette di stampare gli indirizzi in memoria
-//Esempio d'uso di: int scelta = printCascadeMenu("Start\0","Nuovo File,Leggi File,Modifica File,Cancella File,Esci,",5,36,44,00);
+note %p in printf allows to print memory address
+//Menu use case: int scelta = printCascadeMenu("Start\0","Nuovo File,Leggi File,Modifica File,Cancella File,Esci,",5,36,44,00);
+//When you use openssl library compile with: gcc main.c -lm -lssl -lcrypto -o main.lxf
 */
-#define CURP "\033[%d;%df" //Per posizionare il cursore si usa f o H, invece si usa m per i colori
+#define CURP "\033[%d;%df" //To set the cursor in a position f or H are used, instead m is for colors
 #define COLR "\x1B[%dm"
 #define SYSB "\x1B[%dm"
 #define SYSF "\x1B[0;%dm"
@@ -100,8 +109,8 @@ typedef struct{
 
 typedef struct{
     char value;
-    char *operazione; //Lingua italiana
-    char *operation; //lingua inglese o abbreviazione
+    char *operazione; //Italian Language
+    char *operation; //English language or abbreviation
     void (*express)();
 }mathOp;
 
@@ -118,7 +127,7 @@ typedef struct act{
 
 typedef struct con{
     char *daTesto;
-    mathOp tipologia; //sequenziale, interno, sottraendo, aggiungendo, congiunzione diretta, articolo no utile
+    mathOp tipologia; //sequenziale, interno, sottraendo, aggiungendo, congiunzione diretta, articolo no utile - I don't know
 }connettore;
 
 typedef struct{
@@ -155,7 +164,7 @@ pila push(char *obj, pila stack){
     return stack;
 }
 
-possedimenti dataOwn[POSS_LENG]; //array di massimo 300 possedimenti
+possedimenti dataOwn[POSS_LENG]; //Max array lenght is 300 possessions
 
 int * generateIntNumbers(int *ofNum){
     int vetSize = (POS_NUM*2)+1;
@@ -177,7 +186,7 @@ char * alphabetMinusc(char *alph){
 }
 
 char * convertToMinusc(char *str){
-    //Converte una stringa in minuscolo
+    //Change a string to minusc
     int len = strlen(str);
     char *alphMin;
     char *alphMai;
@@ -196,10 +205,10 @@ char * convertToMinusc(char *str){
 
 void gotoXY(int x, int y)
 {
-    //La x e la y di linux sono invertiti rispetto a windows
-    //Qui la x corrisponde allo spostamento su colonna cioè il cursore si muove in basso o in alto
-    //La y indica lo spostamento su riga cioè il cursore si muove a destra o a sinistra
-    //Per MS-Windows è all'incontrario.
+    //X and Y are inverted in linux
+    //The x moves the cursor on the screen column topo and bottom.
+    //The y moves cursor on left or righ.
+    //For MS Windows is the opposite.
     printf(CURP, x, y);
 }
 
@@ -211,7 +220,7 @@ void setColor(int v)
 void clear()
 {
     printf("\033c");
-    //Cancellazione di tutto il testo precedente senza far scorrere lo schermo in basso con ritorno al profilo colori di default nel terminale.
+    //Restore terminal default config
 }
 
 void bestSleep(int val)
@@ -225,7 +234,7 @@ void bestSleep(int val)
 
 void forceColor(int a, int b)
 {
-    /*Questa è la funzione che sostituisce sysColor praticamente pulisce lo schermo sovrascrivendo col colore ovunque*/
+    /*This function is the alternative to sysColor it clear the screen using the color everywhere.*/
     fflush(stdout);
     clear();
     fflush(stdout);
@@ -237,7 +246,7 @@ void forceColor(int a, int b)
 
 void sysColor(int a, int b)
 {
-    /* L'idea era quella di cambiare il colore con il metodo standard e poi modificare ps1 in modo che quando veniva chiamato clear il colore veniva mantenuto per quella sessione ma la cosa non funziona. */
+    /* The idea was that to change color with the standard method and change PS1 in a way that the color would change after calling clear, but not works. */
     fflush(stdout);
     printf(SYSF, b);
     fflush(stdout);
@@ -259,7 +268,7 @@ void show_cursor()
 }
 
 /*
-In entrambe le funzioni chiama getchar(), il resto serve per rimuovere il tasto invio perchè chiamando solo getchar() è necessario premere invio ma con la struttura termios non è necessario.
+Both functions call getchar(), but one remove the return key pressed with termios is not needed.
 */
 int getch(void)
 {
@@ -316,14 +325,10 @@ int fatRic2(int num)
     return num * fatRic(--num);
 }
 
-int fatRic3(int num)
-{
-    (num == 0)?return 1:return num * fatRic(--num); 
-}
+//int fatRic3(int num){(num == 0)?return 1:return (num*fatRic(--num));}
 
 void dividiNumInVet(int val, int *toRet)
 {
-    //Supporto fino a numeri grossi 100000
     int temp;
     if (val <= 9 && val > 0)
     {
@@ -413,7 +418,7 @@ void dividiNumInVet2(int val, int *toRet)
     }
 }
 
-int* dividiNumInVet3(int val)
+int* dividiNumInVet3(int val, int* v)
 {
     int temp;
     int lenVal = 0;
@@ -422,7 +427,7 @@ int* dividiNumInVet3(int val)
     if(val < 1){
         int vet[1];
         vet[0] = (int)val;
-        return val;
+        v=vet;
     }else{
         while(temVal >= 1){
             lenVal++;
@@ -435,8 +440,9 @@ int* dividiNumInVet3(int val)
             val = val%divisore;
             divisore = (int)divisore/10;
         }
-        return toRet;
+        v=toRet;
     }
+    return v;
 }
 
 void stringToInt(char *numStr, int *num){ //passare variabile num con & (&num)
@@ -573,8 +579,6 @@ char *congiunzioni(char * vet){
     return vet;
 }
 
-//Creare un array associativo tra operandi in carattere e funzioni chiamabili
-
 void somma(double x, double y, double *res){
     *res = x+y;
 }
@@ -599,6 +603,12 @@ void pote(double x, double y, double *res){
     *res = pow(x,y);
 }
 
+void my_pow(double x, double y, double *res){
+    for(double i=0;i<y;i++){
+        *res *= x;
+    }
+}
+
 void fact(int *num){
     *num = fatRic2(*num);
 }
@@ -619,7 +629,7 @@ void my_sin(double *x){
     *x = sin(*x);
 }
 
-//Crea un vettore di operandi associati a le relative funzioni
+//Create an array of operands associated to its function
 mathOp * mathOperators(mathOp *operands){
     //void (*fun_ptr)() = somma;
     operands[0].value = '+';
@@ -666,7 +676,7 @@ mathOp * mathOperators(mathOp *operands){
     operands[10].operazione = "NULL";
     operands[10].operation = "null";
     operands[10].express = NULL;
-    //Potenza, logaritmo, sqrt(), fattoriale, cos(), sin()
+    //Pow, logarithm, sqrt(), factorial, cos(), sin()
     return operands;
 }
 
@@ -774,7 +784,7 @@ void inv_int_f(int *x, int *y){
     *x = *y;
     *y = t;
 }
-/*Dichiara una possessione, esempio luca possiede penna (con le stringhe)*/
+/*Declare a possesion, for example Luke own a pen (in natural language)*/
 void declare_own(char *a, char *b){
     int i = 0;
     for(i=0;i<POSS_LENG;i++){
@@ -785,7 +795,7 @@ void declare_own(char *a, char *b){
         }
     }
 }
-/*Verifica una possessione esempio "luca" possiede "penna"?*/
+/*Check if "luca" own a "pen"?*/
 bool verify_own(char *a, char *b){
     int i = 0;
     for(i=0;i<POSS_LENG;i++){
@@ -795,7 +805,7 @@ bool verify_own(char *a, char *b){
     }
     return false;
 }
-/*Verifica se luca possiede qualcosa*/
+/*Check if the owner own something*/
 bool verify_owner(char *a){
     int i = 0;
     for(i=0;i<POSS_LENG;i++){
@@ -805,8 +815,8 @@ bool verify_owner(char *a){
     }
     return false;
 }
-/*Restituisce nei valori passati in b un array, i vari oggetti che possiede luca
-E ritorna un intero corrispondente al numero di elementi ritornati
+/*Return in valued passed in b an array, every object that luca own
+Return an int of returned objects
 */
 int check_owner(char *a, char **b){
     int i = 0;
@@ -819,7 +829,7 @@ int check_owner(char *a, char **b){
     }
     return j;
 }
-/*verifica se una cosa è posseduta da qualcuno*/
+/*Check if something is owned*/
 bool verify_owned(char *b){
     int i = 0;
     for(i=0;i<POSS_LENG;i++){
@@ -829,7 +839,7 @@ bool verify_owned(char *b){
     }
     return false;
 }
-/*controlla quali sono i proprietari che possiedono quella cosa*/
+/*Who own what?It check it.*/
 int check_owned(char **a, char *b){
     int i = 0;
     int j = 0;
@@ -904,7 +914,7 @@ int menu(char *opts, int numOpts, int mainColor, int secoColor, int terzColor)
     gotoXY(2, 0);
     hide_cursor();
     while (i < numOpts)
-    { //Prende le stringhe opts le divide in modo da poterle stampare nel menu con l'effetto grafico di discesa.
+    { //Takes opts strings and divide them so will be printable in the menu with the dorp-down graphic effect.
         if (i > 0)
         {
             j += 1;
@@ -985,7 +995,7 @@ int menu(char *opts, int numOpts, int mainColor, int secoColor, int terzColor)
         fflush(stdout);
         fflush(stdin);
         while (i < numOpts)
-        { //Stessa cosa però senza effetto grafico perchè deve cambiare colore a seconda della selezione.
+        { //Same thing but without graphic effectsbecause it must change color depending on selection.
             if (i > 0)
             {
                 j += 1;
@@ -999,7 +1009,7 @@ int menu(char *opts, int numOpts, int mainColor, int secoColor, int terzColor)
             } while (opts[j] != ',');
             gotoXY((2 + i), 0);
             while ((13 - (n)) > 0)
-            { //Aggiunge gli spazi per allineare il menu.
+            { //Add spaces to align menu.
                 tpr[n] = ' ';
                 tpr[n + 1] = '\0';
                 n++;
@@ -1063,15 +1073,15 @@ For example yellow give a menu yellow with orange text e red title bar text with
     for (i = 0; i < screen; i++)
     {
         fflush(stdout);
-        printf("%c", 35); //176 stampa triangoli su gnome-terminal mentre quadrati sul terminale vero
+        printf("%c", 35); //176 print triangles on gnome-terminal and square on a real tty
     }
     setColor(00);
     fflush(stdin);
     fflush(stdout);
     bestSleep(500);
     int toReturn = 0;
-    //QUESTA SOLUZIONE NON VA BENE UNO DEVE POTER APRIRE IL MENU QUANDO GLI PARE IN QUESTO CASO SERVIREBBERO FORK E PIPE
-    //while(stop==0){ quindi è commentata
+    //This solution is not good because the menu must be opened when you want, a solution with FORK and PIPE it's better.
+    //while(stop==0){ not used
     keyP = getch();
     if (keyP == 109)
     { //press m for open menu
@@ -1079,7 +1089,7 @@ For example yellow give a menu yellow with orange text e red title bar text with
         stop = 1;
     }
     if (keyP == 88)
-    { //Carattere di interruzione. SHIFT+X
+    { //End character. SHIFT+X
         stop = 1;
     }
     //}
@@ -1190,14 +1200,14 @@ void fillStringVect(char *vect1, char *vect2)
 
 void tree_cleaner()
 {
-    //Questa funzione/programma a se, ripulisce l'output del comando tree /dir/.. -aifdo /outdir/..
-    //Poi effettua il confronto tra due file albero per rimuovere i percorsi che non sono uguali.
-    /*Programma per ripulire l'albero di un disco ottenuto con: tree /discLocation -aifdo ./Documents/outputAlbero.txt da:
-	1.L'albero va ripulito dal numero directory infondo al file
-	2.L'albero va ripulito dai link che sono indicati da ->
-	3.L'albero va ripulito dai percorsi che non sono presenti negli altri dischi di confronto
-Dopo di che si possono lanciare i programmi ./SHACreator.lxf e quando ha finito ./SHAMerge.lxf
-In ogni cartella rappresentante un disco deve avere i suoi SHACreator e SHAMerge compilati per quel disco.
+    //This function clean the ouput of tree /dir/.. -aifdo /outdir/..
+    //Remove not equals pathes.
+    /*Clean function for command: tree /discLocation -aifdo ./Documents/outputAlbero.txt da:
+	1.The tree must be cleaned by the number of directories at the end of the file.
+	2.The must be cleaned by link signed with ->
+	3.The tree must cleaned by pathes that are not in the other disks to pair.
+First ./SHACreator.lxf and then when the first end it's possible launch ./SHAMerge.lxf
+SHACreator and SHAMerge must be compiled for that specified disk.
 */
     FILE *rd1;
     FILE *rd2;
@@ -1227,8 +1237,8 @@ In ogni cartella rappresentante un disco deve avere i suoi SHACreator e SHAMerge
                 if (fgets(res2, 490, rd2) != NULL)
                 {
                     if (strcmp(res1, res2) == 0)
-                    { //Non saranno mai uguali perchè la posizione di mount è diversa almeno che non si rende uguale
-                        //Controlla che non sia un link se non lo è copialo nel file aperto in append
+                    { //They will never be the same because the mount position is different
+                        //Check if it a link if not copy it in append
                         lengRes = strlen(res1);
                         for (i = 0; i < lengRes; i++)
                         {
@@ -1239,15 +1249,15 @@ In ogni cartella rappresentante un disco deve avere i suoi SHACreator e SHAMerge
                         }
                         if (notCopyMe == 0)
                         {
-                            //Copia il percorso nel file append
+                            //Copy the path in the file append
                             fprintf(wr, "%s", res1);
                         }
-                        //Altrimenti ignora la copia e riporta il flag a false
+                        //Otherwise it will ignore the copy and set the flag to false
                         notCopyMe = 0;
                     }
                 }
             }
-            //fseek per rileggere il secondo file dall'inzio.
+            //fseek to read again the second file from the beginning
             fseek(rd2, 0L, 0);
         }
     }
@@ -1261,8 +1271,8 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
 {
     char res[491];
     char ptCh[47];
-    fillStringVect(pathOutFile, ptCh); //Percorso di base cosi poi creo il file con numero incrementale.
-    FILE *pf;                          //File dove è scritto l'albero del disco
+    fillStringVect(pathOutFile, ptCh);
+    FILE *pf;
     fflush(stdin);
     pf = fopen(pathOfTreeFile, "r");
     if (pf != NULL)
@@ -1270,7 +1280,7 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
         int i = 1;
         int aryNum[6] = {0, 0, 0, 0, 0, 0};
         while (feof(pf) == 0)
-        { //Finchè il file contentente l'elenco delle directory non è finito. (NE FA UNO IN PIù)
+        {
             if (i == 1000 || i == 3000 || i == 4000 || i == 6000 || i == 8000 || i == 9000)
             {
                 printf("\n\t\tRAFFREDDAMENTO DISCO...\n");
@@ -1280,21 +1290,20 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
             {
                 if (i > 9)
                 {
-                    //Per dare i nomi ai file casuali che contengono i gli sha512 per una directory
-                    dividiNumInVet(i, aryNum); //DiviNumVet dovrebbe ritornare un indirizzo di memoria cosi riempe l'array risolto con passaggio per indirizzo
+                    dividiNumInVet(i, aryNum);
                     ptCh[32] = '0' + aryNum[0];
                     ptCh[33] = '0' + aryNum[1];
                     ptCh[34] = '0' + aryNum[2];
                     ptCh[35] = '0' + aryNum[3];
                     ptCh[36] = '0' + aryNum[4];
                     ptCh[37] = '0' + aryNum[5];
-                    //Tanto poi viene aggiunto il carattere terminatore \0.
+                    //Who cares this character is inserted \0.
                 }
                 else
                 {
-                    ptCh[32] = '0' + i; //Adesso i corrisponde al nome del file.
+                    ptCh[32] = '0' + i; //Now it is the name of the file.
                 }
-                //Stessa cosa di sopra per ptCh.
+                //The same thing as above for ptCh.
                 if (i <= 9)
                 {
                     ptCh[33] = '\0';
@@ -1329,7 +1338,7 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
                     {
                         if (fgets(tmSr, 500, redF) != NULL)
                         {
-                            fprintf(wrtF, "%s", tmSr); //Copio il contenuto del file nel file *.sha
+                            fprintf(wrtF, "%s", tmSr); //I will copy the content of the file in the file *.sha
                         }
                     }
                     fclose(redF);
@@ -1337,9 +1346,9 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
                     char fRem[120] = "rm ";
                     strcat(fRem, ptCh);
                     strcat(fRem, "\0");
-                    system(fRem); //Elimino il file
+                    system(fRem); //Delete the file
                 }
-                //E poi deve eliminare il file (aperto in lettura) che ha appena finito di copiare.
+                //Then must delete the opened file (opened in reading) that as finished to copy.
                 i++;
             }
         } //End While
@@ -1349,14 +1358,14 @@ void sha_merge(char *pathOutFile, char *pathOfTreeFile)
 
 void sha_creator(char *pathOutFile, char *pathOfTreeFile)
 {
-    //Il programma può generare degli errori se non si rileva attività del disco per un lungo periodo premere CTRL+C e il programma continuerà. Il risultato sarà un file singolo.
-    //Il percorso (pathOutFile) deve essere assoulto e avere un file di output come termine anchesso con percorso assoluto
-    //Il pathOfTreeFile è il percorso del file contenente il risultato del comando tree: /dir/da/cui/ottenere/albero -aifdo /dir/out/resoult.txt
+    //If you didn't see disk activity for a long time press CTRL+C in this way the process will go on. The result will be in a single file.
+    //The path (pathOutFile) cannot be relative and the output file must be absolute too.
+    //The pathOfTreeFile it is the file where the output of the command tree is saved: /dir/da/cui/ottenere/albero -aifdo /dir/out/resoult.txt
     char res[491];
-    char scPth[47]; //Percorso di base cosi poi creo il file con numero incrementale.
+    char scPth[47];
     fillStringVect(pathOutFile, scPth);
     char conPh[500] = "openssl  dgst -md5 -hex /myPath/docs* -out ";
-    FILE *pf; //File dove è scritto l'albero del disco
+    FILE *pf; //File where the directory tree is written
     fflush(stdin);
     pf = fopen(pathOfTreeFile, "r");
     if (pf != NULL)
@@ -1364,8 +1373,8 @@ void sha_creator(char *pathOutFile, char *pathOfTreeFile)
         int i = 1;
         int aryNum[6] = {0, 0, 0, 0, 0, 0};
         while (feof(pf) == 0)
-        { //Finchè il file contentente l'elenco delle directory non è finito. (NE FA UNO IN PIù)
-            /*Il processo crea i file con i codici sha512 ogni file corrisponde a una directory */
+        { //Until the file with the directory tree it's not finished one more is processed. (ONE MORE...)
+            /*This process create sha512 for each file in a directory in the worst way possible */
             if (i == 1000 || i == 3000 || i == 4000 || i == 6000 || i == 8000 || i == 9000)
             {
                 printf("\n\t\tRAFFREDDAMENTO DISCO...\n");
@@ -1379,19 +1388,19 @@ void sha_creator(char *pathOutFile, char *pathOfTreeFile)
                 strcat(conPh, "* > ");
                 if (i > 9)
                 {
-                    //Per dare i nomi ai file casuali che contengono i gli sha512 per una directory
-                    dividiNumInVet(i, aryNum); //DiviNumVet dovrebbe ritornare un indirizzo di memoria cosi riempe l'array risolto con passaggio per indirizzo
+                    //To name random file that contains sha512 for a directory
+                    dividiNumInVet(i, aryNum); //DiviNumVet should return a memory address and this should be solved
                     scPth[32] = '0' + aryNum[0];
                     scPth[33] = '0' + aryNum[1];
                     scPth[34] = '0' + aryNum[2];
                     scPth[35] = '0' + aryNum[3];
                     scPth[36] = '0' + aryNum[4];
                     scPth[37] = '0' + aryNum[5];
-                    //Tanto poi viene aggiunto il carattere terminatore \0.
+                    //The ending character is added \0.
                 }
                 else
                 {
-                    scPth[32] = '0' + i; //Adesso i corrisponde al nome del file.
+                    scPth[32] = '0' + i; //Now i it's the name of the file
                 }
                 if (i <= 9)
                 {
@@ -1423,7 +1432,7 @@ void sha_creator(char *pathOutFile, char *pathOfTreeFile)
             }
         } //End While
     }
-    fclose(pf); //Chiudo il file albero
+    fclose(pf); //Close the tree file
     sha_merge(pathOutFile, pathOfTreeFile);
 }
 
@@ -1470,20 +1479,20 @@ number * isANumberWrong(char *str, number *numero){
         if(i>0){
             checkNum(str[i-1], &num2);
         }
-        //ESEMPIO SU dhs23jsio
-        //SE il carattere i è un numero e il carattere (i-1) NO allora entra nel if
-        //SE PUOI ENTRARE NEL IF CONTROLLA SE i-1 è un punto o una virgola e se (i-2) è un numero
-        //L'idea è che se c'è 23 analizzo il 2 è dietro il 2 c'è un punto allora controllo se c'è un numero e se c'è vuol dire che ho tipo
-        //9.23 ciò significa che posso entrare nell'if perchè la prima condizione mi da 1 e la seconda mi da 1 (ANCORA NONONNOO)
-        //Se fosse "asd 23" e analizzo 2 dietro c'è spazio allora la prima mi da 1 mentre la seconda mi da 0 dunque posso entrare
-        //Se fosse 234 e mi trovo sul 3 posso entrare nel'if perchè la prima mi da 1 e la seconda zero
-        //La condizione entra cosi:
+        //For example dhs23jsio
+        //If the character at i it's a number and character at i-1 no than enter in the IF
+        //If you can eneter in the IF check if i-1 is point or comma, and if i-2 is a number.
+        //The idea behind is that if it is 23 I will analyze 2 and behind there is a 2 c'è and if there is a point or comma I will check if it is a numer like
+        //9.23 means that I can enter in the if because the first condition it is 1 and the second it is one 1 (NOT WORKING YET!!!)
+        //If it is "asd 23" and I analyze 2 behind there is space than the first gives me 1 instead the second gives me 0 so I can enter in it
+        //If it is 234 and I'm on 3 I can enter in the if because the first give me 1 and the second zero
+        //The condition enter in this way:
         //    |X|Y|XOR|
-        //    e quella p_xor entra cosi:
+        //    and that p_xor enter in this way:
         //    |1|0|1
         if(p_or_f(p_xor_f((num != -1),(num2 != -1)), ((str[i-1]=='.' || str[i-1]==',') && checkNum(str[i-2],&t_mp)) )){ //trovato un numero, controlla anche se il carattere precedente era un numero così da capire se faceva parte del numero di prima o no
             if(frstTime){
-                //per sapere dove inizia il numero nella stringa
+                //To know where the number of the string start.
                 x = i;
                 y = i;
                 frstTime = false;
@@ -1491,23 +1500,23 @@ number * isANumberWrong(char *str, number *numero){
             int8_t u;
             int chk=0;
             for(u=1;u<NUM_TO_FLOAT;u++){ //
-                if(str[i+u] == '.' || str[i+u] == ','){ //Da cambiare così credo vede solo i float tipo 3.4 e non 43.6 NO FORSE E OK
+                if(str[i+u] == '.' || str[i+u] == ','){ //I don't remember maybe it works or maybe it see only 3.4 and not 43.6. That's because while I was programming this I got interrupted many times and I had to start programming it from scratch after weeks or months.
                 //Check if the number found is float
-                    if((i+(u+1))<=lun){ //Controllo che il punto non sia un segno di fine frase
+                    if((i+(u+1))<=lun){ //I will check that the point is not a end of sentence.
                         chk = 0;
                         checkNum(str[i+(u+1)], &chk);
-                        if(chk != -1){ //Controllo che dopo la virgola ci sia un numero.
+                        if(chk != -1){ //I will check that after the comma will exists a number - Comma or point in italy and in french I think it's comma but in USA it's a point
                             floatValue = true;
                         }
                     }
                 }else{
                     if(!checkNum(str[i+u],&chk)){
-                        break; //Se si tratta di un numero prosegui con il ciclo altrimenti interrompi non è un float
+                        break; //If it is a number go on with the cycle otherwise break it, because it's not a float.
                     }
                 }
             }
         }else{
-            if(frstTime == false){ //Vuol dire che era stato trovato un numero e si può procedere
+            if(frstTime == false){ //A number was found so it can go on.
                 y=(i-1);
                 int len, j, s;
                 len = y+1;
@@ -1517,7 +1526,7 @@ number * isANumberWrong(char *str, number *numero){
                     tmpStr[j] = str[s];
                     s++;
                 }
-                //Non resta che convertire tmpStr in un float value o int
+                //The only thing to is convert tmpStr in a float or int value.
                 if(floatValue == true){
                     stringToFloat(tmpStr,&numF);
                     numero[tag].floatNum = numF;
@@ -1579,9 +1588,9 @@ int spaceCount(char *str){
 }
 
 bool isAnAction(char *str, mathOp *actions, mathOp *toExecute){
-    //Fare ritornare un array di action
+    //Should return an array of actions
     int len = strlen(str);
-    char *key; //Nota *key="mnuc" e key[]="mnuc" sono cose diverse uno viene definito come array(key[]) quindi sequenziale in memoria l'altro come puntatore(*key).
+    char *key; //Note *key="mnuc" and key[]="mnuc" are two different things. One is defined as an array (key[]) so it is sequential in memory the other is a pointer(*key). - Maybe the compiler compile it in different ways, I don't understan what I had written.
     int x=0;
     int spaces = spaceCount(str);
     bool inside = false;
@@ -1605,8 +1614,8 @@ bool isAnAction(char *str, mathOp *actions, mathOp *toExecute){
         }
         for(int i=0;i<MATHOP_LENGHT;i++){
             if((strcmp(key,actions[i].operazione) == 0 || strcmp(key,actions[i].operation) == 0)){
-                //TROVATA corrispondenza tra stringa esempio somma e somma dentro alle azioni
-                *toExecute = actions[i]; //Potrebbe crearsi il problema di indirizzo nel caso richiamo la isAction sarà l'ultimo valore di execute a determinare il valore di tutti
+                //Found a math with sample string sum (or somma) and sum inside actions(azioni)
+                *toExecute = actions[i];
                 return true;
             }
         }
@@ -1616,8 +1625,8 @@ bool isAnAction(char *str, mathOp *actions, mathOp *toExecute){
         key = str; //WARNING
         for(int i=0;i<MATHOP_LENGHT;i++){
             if((strcmp(key,actions[i].operazione) == 0 || strcmp(key,actions[i].operation) == 0)){
-                //TROVATA corrispondenza tra stringa esempio somma e somma dentro alle azioni
-                *toExecute = actions[i]; //Potrebbe crearsi il problema di indirizzo nel caso richiamo la isAction sarà l'ultimo valore di execute a determinare il valore di tutti
+                //Found a math with sample string sum (or somma) and sum inside actions(azioni)
+                *toExecute = actions[i]; //An addressing error could appear, in case isAction is called. It's the last value of execute to determine everything. - I don't remember what I meant.
                 return true;
             }
         }
@@ -1626,7 +1635,7 @@ bool isAnAction(char *str, mathOp *actions, mathOp *toExecute){
 }
 
 bool isAConnector(char *str){
-    //Fare ritornare un array di connettore
+    //Should return an array of connettore
     char *cong;
     cong = congiunzioni(cong);
     int len = strlen(str);
@@ -1724,7 +1733,7 @@ bool isAConnector(char *str){
             }
             spaCon--;
         }
-        //SE metto un printf qui arrayParole assume caratteri a caso
+        //If I setup a printf here, arrayParole takes random characters.
     }
     return connector;
 }
@@ -1771,7 +1780,7 @@ wordsScopo *takeScopo(char *scopo, wordsScopo *aryOfActions){
     wordsScopo paroleAzioni[lenAW];
     memcpy(vetActions,mathOperators(vetActions),MATHOP_LENGHT);
     memcpy(arrayDiParole,getStringsFromSeparator(scopo, ' ', arrayDiParole),lenAW);
-    for(i=0;i<lenAW;i++){ //Per ogni parola nell'array di parole;
+    for(i=0;i<lenAW;i++){ //For each word in the array
         paroleAzioni[i].word = arrayDiParole[i];
         if(isAConnector(arrayDiParole[i])==true){
             paroleAzioni[i].isAction = false;
@@ -1780,12 +1789,12 @@ wordsScopo *takeScopo(char *scopo, wordsScopo *aryOfActions){
             paroleAzioni[i].numero.intNum = 0;
         }else{
             if(isAnAction(arrayDiParole[i],vetActions, &paroleAzioni[i].azione)){
-                //paroleAzioni[i].azione dovrebbe rimanere vuoto se non è un'azione
+                //paroleAzioni[i].azione this should be empty if it's not an action
                 paroleAzioni[i].isAction = true;
                 paroleAzioni[i].isString = false;
                 paroleAzioni[i].numero.is_float = false;
                 paroleAzioni[i].numero.intNum = 0;
-                //Dovrebbe prendere l'azione con &
+                //Action should be taken usign this & but...
             }else{
                 if(isANumber(arrayDiParole[i],&paroleAzioni[i].numero)){
                     paroleAzioni[i].isAction = false;
@@ -1794,13 +1803,272 @@ wordsScopo *takeScopo(char *scopo, wordsScopo *aryOfActions){
             }
         }
         aryOfActions[i] = paroleAzioni[i];
-        //azione prende NULL o oggetto mathOP a null se parola è int o float o stringa
-        //I valori bool vengono istanziati a seconda del tipo
+	//Action takes NULL or object mathOP to NULL if word is an int or a float or a string - This could be a bug
+        //Boolean values are created depending on type.
     }
-    //gcc ai.c -lm -o0 ai.lxf PROVARE A COMPILARE COME PRECEDE
-    //Per ogni elemento stringa nell'array risultante le infilo in array associate a cio che si puo fare
-    //Questo facendo un controllo nei vari DB
+    //Try to compile like this gcc ai.c -lm -o0 ai.lxf
+    //This code is related to a project not yet published.
+    //For each element string in the output array that must be inserted in an array correlated to what you can do.
+    //Only if you check every DB
     return aryOfActions;
+}
+
+//openssl dgst -md5 filename - hash for unreadable file are filled with 0
+char* generaMD5(char* filename){
+    static unsigned char buffer[128];
+    int i=0;
+    char conv[33];
+    char *str = (char *)malloc(sizeof(char)*33);
+    unsigned bytes = 0;
+    FILE* datafile = fopen(filename , "rb");
+    if(datafile!=NULL){
+	    unsigned char digest[MD5_DIGEST_LENGTH];
+	    MD5_CTX ctx;
+	    MD5_Init(&ctx);
+	    while((bytes = fread(buffer, 1, 128, datafile)))
+	    {
+		MD5_Update(&ctx, buffer, bytes);
+	    }
+	    
+	    MD5_Final(digest, &ctx);
+	    fclose(datafile);
+	    for(i=0; i < 16; ++i){
+		sprintf(&conv[i*2], "%02x", (unsigned int)digest[i]);
+	    }
+	    for(i=0;i<33;i++){
+	    	str[i]=conv[i];
+	    }
+    }else{
+       str="00000000000000000000000000000000";
+    }
+    return str;
+}
+
+//openssl dgst -sha1 filename - hash for unreadable file are filled with 0
+char* generaSHA1(char* filename){
+    static unsigned char buffer[128];
+    int i=0;
+    char conv[41];
+    char *str = (char *)malloc(sizeof(char)*41);
+    unsigned bytes = 0;
+    FILE* datafile = fopen(filename , "rb");
+    if(datafile!=NULL){
+	    unsigned char digest[SHA_DIGEST_LENGTH];
+	    SHA_CTX ctx;
+	    SHA1_Init(&ctx);
+	    while((bytes = fread(buffer, 1, 128, datafile)))
+	    {
+		SHA1_Update(&ctx, buffer, bytes);
+	    }
+	    
+	    SHA1_Final(digest, &ctx);
+	    fclose(datafile);
+	    for(i=0; i < 20; ++i){
+		sprintf(&conv[i*2], "%02x", (unsigned int)digest[i]);
+	    }
+	    for(i=0;i<41;i++){
+	    	str[i]=conv[i];
+	    }
+    }else{
+       str="0000000000000000000000000000000000000000";
+    }
+    return str;
+}
+//openssl dgst -sha256 filename - hash for unreadable file are filled with 0
+char* generaSHA256(char* filename){
+    static unsigned char buffer[256];
+    int i=0;
+    char conv[65];
+    char *str = (char *)malloc(sizeof(char)*65);
+    unsigned bytes = 0;
+    FILE* datafile = fopen(filename , "rb");
+    if(datafile!=NULL){
+    	unsigned char digest[SHA256_DIGEST_LENGTH];
+    	SHA256_CTX ctx;
+    	SHA256_Init(&ctx);
+   	while((bytes = fread(buffer, 1, 256, datafile)))
+   	{
+        	SHA256_Update(&ctx, buffer, bytes);
+    	}
+    	SHA256_Final(digest, &ctx);
+    	fclose(datafile);
+    	for(i=0; i < 32; ++i){
+        	sprintf(&conv[i*2], "%02x", (unsigned int)digest[i]);
+    	}
+    	for(i=0;i<65;i++){
+    		str[i]=conv[i];
+    	}
+    }else{
+       str="0000000000000000000000000000000000000000000000000000000000000000";
+    }
+    return str;
+}
+
+//Generate mdf of each file in a directory and save them on the selected file with the path.
+void browseAndGenMD5(char *name, int level, FILE* pf)
+{
+    DIR *dir;
+    struct dirent *entry;
+    if (!(dir = opendir(name)))
+    {
+        return;
+    }
+    if (!(entry = readdir(dir)))
+    {
+        return;
+    }
+    char* linea;
+    char path[1024];
+    do
+    {
+	path[0]='\0';
+	int len = snprintf(path, sizeof(path) - 1, "%s/%s", name, entry->d_name);
+	path[len] = 0;
+	if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+	continue;}
+	linea="";
+	linea=generaMD5(path);
+	fputs(path,pf);
+	fputs(",",pf);
+	fputs(linea,pf);
+	fputs("\n",pf);
+	browseAndGenMD5(path, level + 1,pf);
+    } while ((entry = readdir(dir)));
+    closedir(dir);
+}
+
+//Browse a directory and generate a sha1 for each file that can be read and save them in the selected file without the path.
+void browseAndGenSHA1(char *name, int level, FILE* pf)
+{
+    DIR *dir;
+    struct dirent *entry;
+    if (!(dir = opendir(name)))
+    {
+        return;
+    }
+    if (!(entry = readdir(dir)))
+    {
+        return;
+    }
+    char* linea;
+    char path[1024];
+    do
+    {
+	path[0]='\0';
+	int len = snprintf(path, sizeof(path) - 1, "%s/%s", name, entry->d_name);
+	path[len] = 0;
+	if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+	continue;}
+	linea="";
+	linea=generaSHA1(path);	
+	fputs(linea,pf);
+	fputs("\n",pf);
+	browseAndGenSHA1(path, level + 1,pf);
+    } while ((entry = readdir(dir)));
+    closedir(dir);
+}
+
+//Browse and generate a sha256 for each file in the given directory and save them in the given file without the path.
+void browseAndGenSHA256(char *name, int level, FILE* pf)
+{
+    DIR *dir;
+    struct dirent *entry;
+    if (!(dir = opendir(name)))
+    {
+        return;
+    }
+    if (!(entry = readdir(dir)))
+    {
+        return;
+    }
+    char* linea;
+    char path[1024];
+    pf=fopen("listsum","ab");
+    do
+    {
+	path[0]='\0';
+	int len = snprintf(path, sizeof(path) - 1, "%s/%s", name, entry->d_name);
+	path[len] = 0;
+	if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+	continue;}
+	linea="";
+	linea=generaSHA256(path);
+	//fputs(path,pf);
+	//fputs(",",pf);
+	fputs(linea,pf);
+	fputs("\n",pf);
+	browseAndGenSHA256(path, level + 1,pf);
+    } while ((entry = readdir(dir)));
+    closedir(dir);
+}
+
+/**
+Usage ex of browseAndCheckSHA1
+pf=fopen("checklist","wb");
+cf=fopen("listsum","rb");
+browseAndCheckSHA1("/bin",1,pf,cf);
+browseAndCheckSHA1("/boot",2,pf,cf);
+browseAndCheckSHA1("/etc",2,pf,cf);
+browseAndCheckSHA1("/usr/bin",1,pf,cf);
+fclose(pf);
+fclose(cf);
+**/
+
+void browseAndCheckSHA1(char *name, int level, FILE* pf, FILE* cf)
+{
+    DIR *dir;
+    struct dirent *entry;
+    if (!(dir = opendir(name)))
+    {
+        return;
+    }
+    if (!(entry = readdir(dir)))
+    {
+        return;
+    }
+    char* linea;
+    char orln[41];
+    char path[1024];
+    int i=0;
+    do
+    {
+	path[0]='\0';
+	int len = snprintf(path, sizeof(path) - 1, "%s/%s", name, entry->d_name);
+	path[len] = 0;
+	if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0){
+	continue;}
+	fflush(stdin);
+	linea="";
+	for(i=0;i<40;i++){
+		orln[i]=0;	
+	}
+	orln[40]='\0';
+	linea=generaSHA1(path);
+	//fwrite(linea,sizeof(linea),1,pf);
+	fputs(linea,pf);
+	fputs("\n",pf);
+	fflush(stdin);
+	fread(orln,1,40,cf);
+	fseek(cf,1,1);
+	if(strcmp(orln,linea)!=0){
+		printf("\nDifferent: %s\n",path);
+		printf("\norln: %s\n",orln);
+		printf("\nlinea: %s\n",linea);
+	}
+	browseAndCheckSHA1(path, level + 1,pf,cf);
+    } while ((entry = readdir(dir)));
+    closedir(dir);
+}
+
+
+//In order to call this function you need to open the file with fopen(rb)
+//linelen is the number of byte to read
+//You can read a test file line per line of chars setting jumpByte to 1 and position to 1
+char* readALine(char* line, int linelen, int jumpByte, int position, FILE* pf){
+	line = (char *)malloc(sizeof(char)*linelen);
+	fread(line,1,linelen,pf);
+	fseek(pf,jumpByte,position); //Jump n byte from current position
+	return line;
 }
 
 /*
@@ -1844,5 +2112,11 @@ int getScreenSize(int *w, int *h){
 	return 0;
 }
 */
+
+/**
+Compile with all possible warnings
+gcc checkSYS.c -lm -lssl -lcrypto -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wdisabled-optimization -Wformat=2 -Winit-self -Wlogical-op -Wmissing-declarations -Wmissing-include-dirs -Wredundant-decls -Wshadow -Wsign-conversion  -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror  -o checkSYS.lxf
+
+**/
 
 #endif
